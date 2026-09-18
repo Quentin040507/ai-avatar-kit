@@ -34,3 +34,7 @@
 ---
 
 Made by 刘全 Quentin Liu · 香港城市大学 数据科学
+
+---
+
+**在线体验**：https://quentin040507.github.io/ai-avatar-kit/
