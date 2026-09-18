@@ -38,3 +38,10 @@ Made by 刘全 Quentin Liu · 香港城市大学 数据科学
 ---
 
 **在线体验**：https://quentin040507.github.io/ai-avatar-kit/
+
+## ② 个人主页生成器（同学可直接用）
+
+**https://quentin040507.github.io/ai-avatar-kit/make-yours.html**
+
+打开后按引导三步走：上传简历（PDF / 粘贴文字）自动填内容 → 上传照片换成自己的形象 → 点「生成网页」下载单文件 HTML。纯前端、本机处理，不上传服务器。
+
