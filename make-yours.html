@@ -1116,36 +1116,61 @@ body.editing #blkTip{display:flex}
 
 </style>
 <script id="lqPdfLazy">
-/* pdf.js 按需加载：首屏不带它，点「上传简历」时才拉 pdf-bundle.js */
+/* pdf.js 按需加载：首屏不带它。CDN 优先（快），失败回退同目录 pdf-bundle.js（慢但可用） */
 (function(){
   var LOADING = null;
+  var CDNS = ['https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/',
+              'https://unpkg.com/pdfjs-dist@3.11.174/build/'];
   function toast(msg, keep){
     var t = document.getElementById('toast'); if(!t) return;
     t.textContent = msg; t.classList.add('show');
     clearTimeout(t._t);
     if(!keep) t._t = setTimeout(function(){ t.classList.remove('show'); }, 2600);
   }
-  window.__ensurePdfJs = function(){
-    if(window.pdfjsLib) return Promise.resolve(true);
-    if(LOADING) return LOADING;
-    toast('\u6b63\u5728\u51c6\u5907\u7b80\u5386\u89e3\u6790\u5f15\u64ce\u2026', true);
-    LOADING = new Promise(function(res, rej){
-      var s = document.createElement('script');
-      s.src = 'pdf-bundle.js';
-      s.onload  = function(){ toast('\u5c31\u7eea'); res(true); };
-      s.onerror = function(){ LOADING = null; rej(new Error('pdf-bundle load fail')); };
+  function loadScript(src, timeout){
+    return new Promise(function(res, rej){
+      var s = document.createElement('script'), done = false;
+      var timer = setTimeout(function(){ if(!done){ done = true; s.onload = s.onerror = null; rej(new Error('timeout')); } }, timeout);
+      s.src = src;
+      s.onload  = function(){ if(done) return; done = true; clearTimeout(timer); res(true); };
+      s.onerror = function(){ if(done) return; done = true; clearTimeout(timer); rej(new Error('error')); };
       document.head.appendChild(s);
     });
+  }
+  function ok(){ return !!(window.pdfjsLib && window.pdfjsLib.getDocument); }
+  window.__ensurePdfJs = function(){
+    if(ok()) return Promise.resolve(true);
+    if(LOADING) return LOADING;
+    toast('\u6b63\u5728\u51c6\u5907\u7b80\u5386\u89e3\u6790\u5f15\u64ce\u2026', true);
+    var chain = Promise.reject(new Error('start'));
+    CDNS.forEach(function(base){
+      chain = chain.catch(function(){
+        return loadScript(base + 'pdf.min.js', 8000).then(function(){
+          if(!ok()) throw new Error('cdn loaded but no lib');
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = base + 'pdf.worker.min.js';
+          return true;
+        });
+      });
+    });
+    chain = chain.catch(function(){
+      /* 兜底：同目录 pdf-bundle.js（约 1.5MB，慢网可能要 1-2 分钟） */
+      toast('\u6b63\u5728\u4ece\u672c\u5730\u52a0\u8f7d\u7b80\u5386\u89e3\u6790\uff08\u7f51\u901f\u6162\u65f6\u7ea6 1-2 \u5206\u949f\uff0c\u4e5f\u53ef\u76f4\u63a5\u7c98\u8d34\u6587\u5b57\uff09', true);
+      return loadScript('pdf-bundle.js', 180000).then(function(){
+        if(!ok()) throw new Error('local bundle bad');
+        if(window.__pdfEnsureWorker) window.__pdfEnsureWorker();
+        return true;
+      });
+    });
+    LOADING = chain.then(function(v){ toast('\u5c31\u7eea'); return v; })
+      .catch(function(e){ LOADING = null;
+        toast('\u7b80\u5386\u89e3\u6790\u52a0\u8f7d\u5931\u8d25\uff0c\u8bf7\u76f4\u63a5\u7c98\u8d34\u7b80\u5386\u6587\u5b57\uff08\u6548\u679c\u4e00\u6837\uff09');
+        throw e; });
     return LOADING;
   };
   function warm(){
     var b = document.getElementById('btnResume');
     if(!b) return;
-    b.addEventListener('click', function(){
-      window.__ensurePdfJs().catch(function(){
-        toast('\u7b80\u5386\u89e3\u6790\u52a0\u8f7d\u5931\u8d25\uff0c\u53ef\u76f4\u63a5\u7c98\u8d34\u7b80\u5386\u6587\u5b57\u4f7f\u7528');
-      });
-    }, true);
+    b.addEventListener('click', function(){ window.__ensurePdfJs().catch(function(){}); }, true);
   }
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', warm);
   else warm();
@@ -3359,36 +3384,61 @@ var SECTIONS = {
     var PAY = '<scr' + 'ipt>window.__HB_SECTIONS__=' + JSON.stringify(SECTIONS) + ';</scr' + 'ipt>';
     var html = '<!DOCTYPE html>\n' + clone.outerHTML;
     html = html.replace('<script id="lqPdfLazy">
-/* pdf.js 按需加载：首屏不带它，点「上传简历」时才拉 pdf-bundle.js */
+/* pdf.js 按需加载：首屏不带它。CDN 优先（快），失败回退同目录 pdf-bundle.js（慢但可用） */
 (function(){
   var LOADING = null;
+  var CDNS = ['https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/',
+              'https://unpkg.com/pdfjs-dist@3.11.174/build/'];
   function toast(msg, keep){
     var t = document.getElementById('toast'); if(!t) return;
     t.textContent = msg; t.classList.add('show');
     clearTimeout(t._t);
     if(!keep) t._t = setTimeout(function(){ t.classList.remove('show'); }, 2600);
   }
-  window.__ensurePdfJs = function(){
-    if(window.pdfjsLib) return Promise.resolve(true);
-    if(LOADING) return LOADING;
-    toast('\u6b63\u5728\u51c6\u5907\u7b80\u5386\u89e3\u6790\u5f15\u64ce\u2026', true);
-    LOADING = new Promise(function(res, rej){
-      var s = document.createElement('script');
-      s.src = 'pdf-bundle.js';
-      s.onload  = function(){ toast('\u5c31\u7eea'); res(true); };
-      s.onerror = function(){ LOADING = null; rej(new Error('pdf-bundle load fail')); };
+  function loadScript(src, timeout){
+    return new Promise(function(res, rej){
+      var s = document.createElement('script'), done = false;
+      var timer = setTimeout(function(){ if(!done){ done = true; s.onload = s.onerror = null; rej(new Error('timeout')); } }, timeout);
+      s.src = src;
+      s.onload  = function(){ if(done) return; done = true; clearTimeout(timer); res(true); };
+      s.onerror = function(){ if(done) return; done = true; clearTimeout(timer); rej(new Error('error')); };
       document.head.appendChild(s);
     });
+  }
+  function ok(){ return !!(window.pdfjsLib && window.pdfjsLib.getDocument); }
+  window.__ensurePdfJs = function(){
+    if(ok()) return Promise.resolve(true);
+    if(LOADING) return LOADING;
+    toast('\u6b63\u5728\u51c6\u5907\u7b80\u5386\u89e3\u6790\u5f15\u64ce\u2026', true);
+    var chain = Promise.reject(new Error('start'));
+    CDNS.forEach(function(base){
+      chain = chain.catch(function(){
+        return loadScript(base + 'pdf.min.js', 8000).then(function(){
+          if(!ok()) throw new Error('cdn loaded but no lib');
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = base + 'pdf.worker.min.js';
+          return true;
+        });
+      });
+    });
+    chain = chain.catch(function(){
+      /* 兜底：同目录 pdf-bundle.js（约 1.5MB，慢网可能要 1-2 分钟） */
+      toast('\u6b63\u5728\u4ece\u672c\u5730\u52a0\u8f7d\u7b80\u5386\u89e3\u6790\uff08\u7f51\u901f\u6162\u65f6\u7ea6 1-2 \u5206\u949f\uff0c\u4e5f\u53ef\u76f4\u63a5\u7c98\u8d34\u6587\u5b57\uff09', true);
+      return loadScript('pdf-bundle.js', 180000).then(function(){
+        if(!ok()) throw new Error('local bundle bad');
+        if(window.__pdfEnsureWorker) window.__pdfEnsureWorker();
+        return true;
+      });
+    });
+    LOADING = chain.then(function(v){ toast('\u5c31\u7eea'); return v; })
+      .catch(function(e){ LOADING = null;
+        toast('\u7b80\u5386\u89e3\u6790\u52a0\u8f7d\u5931\u8d25\uff0c\u8bf7\u76f4\u63a5\u7c98\u8d34\u7b80\u5386\u6587\u5b57\uff08\u6548\u679c\u4e00\u6837\uff09');
+        throw e; });
     return LOADING;
   };
   function warm(){
     var b = document.getElementById('btnResume');
     if(!b) return;
-    b.addEventListener('click', function(){
-      window.__ensurePdfJs().catch(function(){
-        toast('\u7b80\u5386\u89e3\u6790\u52a0\u8f7d\u5931\u8d25\uff0c\u53ef\u76f4\u63a5\u7c98\u8d34\u7b80\u5386\u6587\u5b57\u4f7f\u7528');
-      });
-    }, true);
+    b.addEventListener('click', function(){ window.__ensurePdfJs().catch(function(){}); }, true);
   }
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', warm);
   else warm();
@@ -3421,36 +3471,61 @@ var SECTIONS = {
 @media (max-width:640px){.lqg-card{padding:20px 18px 16px}.lqg-help{bottom:74px}}
 </style>
 </head>', RO + '\n' + PAY + '\n<script id="lqPdfLazy">
-/* pdf.js 按需加载：首屏不带它，点「上传简历」时才拉 pdf-bundle.js */
+/* pdf.js 按需加载：首屏不带它。CDN 优先（快），失败回退同目录 pdf-bundle.js（慢但可用） */
 (function(){
   var LOADING = null;
+  var CDNS = ['https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/',
+              'https://unpkg.com/pdfjs-dist@3.11.174/build/'];
   function toast(msg, keep){
     var t = document.getElementById('toast'); if(!t) return;
     t.textContent = msg; t.classList.add('show');
     clearTimeout(t._t);
     if(!keep) t._t = setTimeout(function(){ t.classList.remove('show'); }, 2600);
   }
-  window.__ensurePdfJs = function(){
-    if(window.pdfjsLib) return Promise.resolve(true);
-    if(LOADING) return LOADING;
-    toast('\u6b63\u5728\u51c6\u5907\u7b80\u5386\u89e3\u6790\u5f15\u64ce\u2026', true);
-    LOADING = new Promise(function(res, rej){
-      var s = document.createElement('script');
-      s.src = 'pdf-bundle.js';
-      s.onload  = function(){ toast('\u5c31\u7eea'); res(true); };
-      s.onerror = function(){ LOADING = null; rej(new Error('pdf-bundle load fail')); };
+  function loadScript(src, timeout){
+    return new Promise(function(res, rej){
+      var s = document.createElement('script'), done = false;
+      var timer = setTimeout(function(){ if(!done){ done = true; s.onload = s.onerror = null; rej(new Error('timeout')); } }, timeout);
+      s.src = src;
+      s.onload  = function(){ if(done) return; done = true; clearTimeout(timer); res(true); };
+      s.onerror = function(){ if(done) return; done = true; clearTimeout(timer); rej(new Error('error')); };
       document.head.appendChild(s);
     });
+  }
+  function ok(){ return !!(window.pdfjsLib && window.pdfjsLib.getDocument); }
+  window.__ensurePdfJs = function(){
+    if(ok()) return Promise.resolve(true);
+    if(LOADING) return LOADING;
+    toast('\u6b63\u5728\u51c6\u5907\u7b80\u5386\u89e3\u6790\u5f15\u64ce\u2026', true);
+    var chain = Promise.reject(new Error('start'));
+    CDNS.forEach(function(base){
+      chain = chain.catch(function(){
+        return loadScript(base + 'pdf.min.js', 8000).then(function(){
+          if(!ok()) throw new Error('cdn loaded but no lib');
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = base + 'pdf.worker.min.js';
+          return true;
+        });
+      });
+    });
+    chain = chain.catch(function(){
+      /* 兜底：同目录 pdf-bundle.js（约 1.5MB，慢网可能要 1-2 分钟） */
+      toast('\u6b63\u5728\u4ece\u672c\u5730\u52a0\u8f7d\u7b80\u5386\u89e3\u6790\uff08\u7f51\u901f\u6162\u65f6\u7ea6 1-2 \u5206\u949f\uff0c\u4e5f\u53ef\u76f4\u63a5\u7c98\u8d34\u6587\u5b57\uff09', true);
+      return loadScript('pdf-bundle.js', 180000).then(function(){
+        if(!ok()) throw new Error('local bundle bad');
+        if(window.__pdfEnsureWorker) window.__pdfEnsureWorker();
+        return true;
+      });
+    });
+    LOADING = chain.then(function(v){ toast('\u5c31\u7eea'); return v; })
+      .catch(function(e){ LOADING = null;
+        toast('\u7b80\u5386\u89e3\u6790\u52a0\u8f7d\u5931\u8d25\uff0c\u8bf7\u76f4\u63a5\u7c98\u8d34\u7b80\u5386\u6587\u5b57\uff08\u6548\u679c\u4e00\u6837\uff09');
+        throw e; });
     return LOADING;
   };
   function warm(){
     var b = document.getElementById('btnResume');
     if(!b) return;
-    b.addEventListener('click', function(){
-      window.__ensurePdfJs().catch(function(){
-        toast('\u7b80\u5386\u89e3\u6790\u52a0\u8f7d\u5931\u8d25\uff0c\u53ef\u76f4\u63a5\u7c98\u8d34\u7b80\u5386\u6587\u5b57\u4f7f\u7528');
-      });
-    }, true);
+    b.addEventListener('click', function(){ window.__ensurePdfJs().catch(function(){}); }, true);
   }
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', warm);
   else warm();
@@ -9135,7 +9210,7 @@ window.__qrCanvas = function(text, px, dark, light){
     <h2>做一份你自己的个人主页</h2>
     <p class="sub">3 步搞定，约 2 分钟。你的简历和照片只在你自己的电脑里处理，不会上传到任何服务器。</p>
     <div class="lqg-step"><div class="lqg-n">1</div><div class="lqg-t">
-      <b>上传简历，自动填内容</b><span>点下面「上传简历」，支持 PDF，也可以直接粘贴简历文字；解析完可逐项修改再应用。</span></div></div>
+      <b>粘贴简历文字，自动填内容（最快）</b><span>点下面「上传简历」，把简历内容复制粘贴进去最稳；也支持上传 PDF（首次需加载解析引擎，慢网可能要等 1-2 分钟）。填完可逐项修改再应用。</span></div></div>
     <div class="lqg-step"><div class="lqg-n">2</div><div class="lqg-t">
       <b>上传照片，换成你的形象</b><span>点页面左边的人物形象 → 一键导入，粘贴或拖入照片即可；也可以让 AI 生成专属形象。</span></div></div>
     <div class="lqg-step"><div class="lqg-n">3</div><div class="lqg-t">
