@@ -2643,6 +2643,343 @@ var SECTIONS = {
 
 </script>
 
+<!-- ============================================================
+     分享链接 v1（仅同学版）
+     把当前作品（文字 + 板块内容 + 形象照）压缩编码进网址，
+     对方点开链接就能看到你的主页，不用下载文件。
+     ============================================================ -->
+<style id="lqShareCSS">
+#lqShareBar{position:fixed;left:0;right:0;top:0;z-index:9997;display:flex;justify-content:center;padding:10px;pointer-events:none}
+#lqShareBar[hidden]{display:none}
+.lqs-pill{pointer-events:auto;display:flex;align-items:center;gap:9px;max-width:min(680px,94vw);
+  background:#fff;border:1px solid rgba(20,26,40,.12);border-radius:999px;padding:7px 9px 7px 15px;
+  box-shadow:0 8px 26px rgba(16,22,40,.16);font-size:13px;color:#1d2230;line-height:1.4}
+.lqs-pill b{font-weight:600}
+.lqs-pill .go{border:0;background:#2b4dd6;color:#fff;border-radius:999px;padding:7px 13px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap}
+.lqs-pill .x{flex:0 0 auto;border:0;background:#eef1f8;color:#2b3550;border-radius:999px;padding:6px 10px;font-size:12px;cursor:pointer;white-space:nowrap}
+#lqShareModal{position:fixed;inset:0;z-index:100001;display:flex;align-items:center;justify-content:center;
+  background:rgba(18,22,32,.52);padding:18px;font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+#lqShareModal[hidden]{display:none}
+.lqs-card{width:min(560px,100%);max-height:88vh;overflow:auto;background:#fff;border-radius:18px;padding:22px 22px 18px;
+  box-shadow:0 24px 70px rgba(0,0,0,.28);color:#1d2230}
+.lqs-card h3{margin:0 0 6px;font-size:18px;font-weight:600}
+.lqs-card p{margin:0 0 12px;font-size:13px;color:#6b7488;line-height:1.65}
+.lqs-url{width:100%;box-sizing:border-box;height:92px;resize:none;border:1px solid #dfe4ee;border-radius:10px;
+  padding:10px;font-size:12px;line-height:1.5;color:#2b3550;font-family:ui-monospace,Menlo,Consolas,monospace}
+.lqs-btns{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
+.lqs-b{border:0;border-radius:11px;padding:10px 15px;font-size:13.5px;font-weight:600;cursor:pointer}
+.lqs-b.p{background:#2b4dd6;color:#fff}
+.lqs-b.s{background:#eef1f8;color:#2b3550}
+.lqs-warn{margin-top:11px;background:#fff7ed;border:1px solid #fde3c2;color:#8a5300;border-radius:10px;padding:9px 11px;font-size:12.5px;line-height:1.6}
+@media (max-width:480px){.lqs-ver{display:none}}
+.lqs-tip{margin-top:11px;background:#f5f7fc;border:1px solid #e3e8f4;color:#5b6478;border-radius:10px;padding:9px 11px;font-size:12.5px;line-height:1.6}
+</style>
+
+<div id="lqShareBar" hidden>
+  <div class="lqs-pill">
+    <span class="lqs-txt">这是 <b id="lqsName">TA</b> 的个人主页<span class="lqs-ver">（分享版）</span></span>
+    <button class="go" id="lqsMine" type="button">我也要做一个</button>
+    <button class="x" id="lqsHide" type="button">关闭</button>
+  </div>
+</div>
+
+<div id="lqShareModal" hidden>
+  <div class="lqs-card" role="dialog" aria-modal="true" aria-label="分享链接">
+    <h3>你的个人主页链接已生成</h3>
+    <p>复制下面的链接发到微信，对方点开就能看到你的主页，不用下载文件。内容就藏在链接里，换手机、换电脑都能打开。</p>
+    <textarea class="lqs-url" id="lqsUrl" readonly></textarea>
+    <div class="lqs-btns">
+      <button class="lqs-b p" id="lqsCopy" type="button">复制链接</button>
+      <button class="lqs-b s" id="lqsOpen" type="button">预览一下</button>
+      <button class="lqs-b s" id="lqsDl" type="button">改用文件下载</button>
+      <button class="lqs-b s" id="lqsClose" type="button">关闭</button>
+    </div>
+    <div class="lqs-tip" id="lqsTip" hidden></div>
+    <div class="lqs-warn" id="lqsWarn" hidden></div>
+  </div>
+</div>
+
+<script id="lqShare">
+(function(){
+  'use strict';
+  var LS    = 'lq_handbook_v1';
+  var LIMIT = 12000;
+
+  function $(id){ return document.getElementById(id); }
+  function toast(msg){
+    var t = $('toast'); if(!t) return;
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(t._t);
+    t._t = setTimeout(function(){ t.classList.remove('show'); }, 2600);
+  }
+  function baseURL(){ return location.origin + location.pathname; }
+
+  function b64url(u8){
+    var s = '', CH = 0x8000;
+    for(var i=0;i<u8.length;i+=CH) s += String.fromCharCode.apply(null, u8.subarray(i, i+CH));
+    return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  }
+  function unb64(str){
+    str = str.replace(/-/g,'+').replace(/_/g,'/');
+    while(str.length % 4) str += '=';
+    var s = atob(str), u = new Uint8Array(s.length);
+    for(var i=0;i<s.length;i++) u[i] = s.charCodeAt(i);
+    return u;
+  }
+  function deflate(str){
+    var bytes = new TextEncoder().encode(str);
+    if(!(window.CompressionStream && window.Blob && Blob.prototype.stream)){
+      return Promise.resolve('r' + b64url(bytes));
+    }
+    try{
+      var st = new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+      return new Response(st).arrayBuffer().then(function(buf){
+        return 'z' + b64url(new Uint8Array(buf));
+      }).catch(function(){ return 'r' + b64url(bytes); });
+    }catch(e){ return Promise.resolve('r' + b64url(bytes)); }
+  }
+  function inflate(p){
+    var kind = p.charAt(0), bytes = unb64(p.slice(1));
+    if(kind === 'z' && window.DecompressionStream && window.Blob && Blob.prototype.stream){
+      try{
+        var st = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+        return new Response(st).arrayBuffer().then(function(buf){
+          return new TextDecoder().decode(new Uint8Array(buf));
+        }).catch(function(){ return new TextDecoder().decode(bytes); });
+      }catch(e){}
+    }
+    return Promise.resolve(new TextDecoder().decode(bytes));
+  }
+
+  /* 把形象照压小：链接长度主要被它吃掉 */
+  function shrink(src, maxW, q){
+    return new Promise(function(res){
+      if(!src || src.indexOf('data:image/') !== 0) return res(src);
+      var im = new Image();
+      im.onload = function(){
+        var w = im.naturalWidth || im.width, h = im.naturalHeight || im.height;
+        if(!w || !h) return res(src);
+        var sc = Math.min(1, maxW / w);
+        var c = document.createElement('canvas');
+        c.width  = Math.max(1, Math.round(w * sc));
+        c.height = Math.max(1, Math.round(h * sc));
+        var g = c.getContext('2d');
+        try{ g.imageSmoothingQuality = 'high'; }catch(e){}
+        g.drawImage(im, 0, 0, c.width, c.height);
+        var out = '';
+        try{ out = c.toDataURL('image/webp', q); }catch(e){}
+        if(!out || out.indexOf('data:image/webp') !== 0){
+          try{ out = c.toDataURL('image/jpeg', q); }catch(e){}
+        }
+        res(out && out.length > 200 ? out : src);
+      };
+      im.onerror = function(){ res(src); };
+      im.src = src;
+    });
+  }
+
+  function readSnap(){
+    try{
+      var raw = localStorage.getItem(LS);
+      if(raw){ var o = JSON.parse(raw); if(o && o.v) return o; }
+    }catch(e){}
+    var o = { v:1, texts:{}, sections:{}, deco:[], avatar:'' };
+    var nodes = document.querySelectorAll('[data-ed]');
+    for(var i=0;i<nodes.length;i++) o.texts[nodes[i].getAttribute('data-ed')] = nodes[i].innerHTML;
+    try{
+      var S = window.SECTIONS || {};
+      Object.keys(S).forEach(function(k){ o.sections[k] = { title:S[k].title, body:S[k].body }; });
+    }catch(e){}
+    var img = document.querySelector('.poster .avatar-img') || document.querySelector('.avatar-img');
+    if(img) o.avatar = img.src || '';
+    return o;
+  }
+
+  function nameOf(o){
+    var nm = (o && o.texts && o.texts.nm) || '';
+    var d = document.createElement('div'); d.innerHTML = nm;
+    var first = (d.firstChild && d.firstChild.nodeType === 3) ? d.firstChild.nodeValue : (d.textContent || '');
+    var s = String(first || '').replace(/\s+/g, '').slice(0, 16);
+    return s || 'TA';
+  }
+
+  function setImg(src){
+    var slot = document.querySelector('.poster .avatar-slot') || document.querySelector('.avatar-slot');
+    if(!slot) return;
+    var ph = slot.querySelector('.avatar-ph'); if(ph) ph.parentNode.removeChild(ph);
+    var img = slot.querySelector('.avatar-img');
+    if(!img){
+      img = document.createElement('img');
+      img.className = 'avatar-img'; img.alt = '我的形象';
+      slot.insertBefore(img, slot.firstChild);
+    }
+    img.src = src;
+  }
+
+  function applySnap(o){
+    if(!o) return;
+    if(o.texts){
+      var nodes = document.querySelectorAll('[data-ed]');
+      for(var i=0;i<nodes.length;i++){
+        var k = nodes[i].getAttribute('data-ed');
+        if(o.texts[k] != null) nodes[i].innerHTML = o.texts[k];
+      }
+    }
+    if(o.sections && window.SECTIONS){
+      Object.keys(o.sections).forEach(function(k){
+        if(window.SECTIONS[k] && o.sections[k]){
+          window.SECTIONS[k].title = o.sections[k].title || window.SECTIONS[k].title;
+          window.SECTIONS[k].body  = o.sections[k].body  || window.SECTIONS[k].body;
+        }
+      });
+    }
+    applyAvatar(o.avatar);
+  }
+
+  /* 形象系统（__avFX）可能比分享脚本晚初始化，这里先直接上图、再轮询接管 */
+  function applyAvatar(src){
+    if(!src) return;
+    setImg(src);
+    var n = 0;
+    (function tick(){
+      if(window.__avFX && window.__avFX.set){
+        try{ window.__avFX.set('idle', src); }catch(e){}
+        return;
+      }
+      if(n++ < 40) setTimeout(tick, 100);
+    })();
+  }
+
+  /* 分享模式下锁住本机的存档写入，别把别人的内容盖掉自己的草稿 */
+  function guard(){
+    try{
+      var orig = Storage.prototype.setItem;
+      Storage.prototype.setItem = function(k, v){
+        if(k === LS) return;
+        return orig.apply(this, arguments);
+      };
+    }catch(e){}
+  }
+
+  function buildLink(){
+    var snap = readSnap();
+    var tries = [[480,0.82],[360,0.78],[280,0.70],[200,0.60]];
+    var i = 0, best = null;
+    function step(){
+      if(i >= tries.length) return Promise.resolve(best);
+      var t = tries[i++];
+      return shrink(snap.avatar, t[0], t[1]).then(function(av){
+        var s2 = { v:1, texts:snap.texts||{}, sections:snap.sections||{}, deco:[], avatar:av };
+        return deflate(JSON.stringify(s2)).then(function(p){
+          best = { payload:p, len:p.length, ok:p.length <= LIMIT, name:nameOf(snap), placeholder: (snap.avatar||'').indexOf('data:image/svg+xml') === 0 };
+          if(best.ok) return best;
+          return step();
+        });
+      });
+    }
+    return step();
+  }
+
+  /* ---------- 弹窗 ---------- */
+  function openModal(r){
+    var url = baseURL() + '#s=' + r.payload;
+    var ta = $('lqsUrl'); if(ta) ta.value = url;
+    var tip = $('lqsTip'), warn = $('lqsWarn');
+    if(tip){
+      if(r.placeholder){ tip.hidden = false; tip.innerHTML = '你还没换成自己的形象，链接里会是个灰色占位图。想更好看点，先点左边的人物形象上传一张照片，再来生成链接。'; }
+      else tip.hidden = true;
+    }
+    if(warn){
+      if(!r.ok){ warn.hidden = false; warn.innerHTML = '内容偏多（链接约 ' + Math.round(r.len/1000) + 'K 字符），个别手机可能打不开。建议改用「生成网页」下载文件发送。'; }
+      else warn.hidden = true;
+    }
+    $('lqShareModal').hidden = false;
+  }
+  function closeModal(){ $('lqShareModal').hidden = true; }
+
+  function copyUrl(){
+    var ta = $('lqsUrl'); if(!ta) return;
+    var url = ta.value;
+    function ok(){ toast('链接已复制，粘贴到微信发给对方就行'); }
+    function fallback(){
+      ta.focus(); ta.select();
+      try{ ta.setSelectionRange(0, 999999); }catch(e){}
+      var done = false;
+      try{ done = document.execCommand('copy'); }catch(e){}
+      if(done) ok(); else toast('复制失败，请长按上面的链接手动复制');
+    }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(url).then(ok, fallback);
+    }else fallback();
+  }
+
+  function addDockBtn(){
+    if($('btnLink')) return;
+    var exp = $('btnExport');
+    if(!exp || !exp.parentNode) return;
+    var b = document.createElement('button');
+    b.className = 'dock-btn';
+    b.id = 'btnLink';
+    b.type = 'button';
+    b.setAttribute('data-label', '分享链接');
+    b.setAttribute('aria-label', '分享链接');
+    b.innerHTML = '<svg class="ico"><use href="#i-link"/></svg>';
+    exp.parentNode.insertBefore(b, exp.nextSibling);
+    b.addEventListener('click', function(){
+      toast('正在生成链接…');
+      buildLink().then(function(r){
+        if(!r){ toast('生成失败，请刷新页面重试'); return; }
+        openModal(r);
+      });
+    });
+  }
+
+  function bind(){
+    var m = $('lqShareModal');
+    if(!m) return;
+    $('lqsCopy').addEventListener('click', copyUrl);
+    $('lqsOpen').addEventListener('click', function(){ window.open($('lqsUrl').value, '_blank'); });
+    $('lqsDl').addEventListener('click', function(){
+      closeModal();
+      var be = $('btnExport'); if(be) be.click();
+    });
+    $('lqsClose').addEventListener('click', closeModal);
+    m.addEventListener('click', function(e){ if(e.target === m) closeModal(); });
+    $('lqsHide').addEventListener('click', function(){ $('lqShareBar').hidden = true; });
+    $('lqsMine').addEventListener('click', function(){
+      try{
+        history.replaceState(null, '', baseURL());
+        localStorage.removeItem('lq_guest_guide_v1');
+        sessionStorage.removeItem('lq_guest_guide_v1');
+      }catch(e){}
+      location.reload();
+    });
+    document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeModal(); });
+  }
+
+  /* ---------- 启动 ---------- */
+  var h = location.hash || '';
+  var mm = h.match(/[#&]s=([A-Za-z0-9\-_]+)/);
+  if(mm){
+    window.__LQ_SHARED__ = true;
+    guard();
+    inflate(mm[1]).then(function(txt){
+      var o = null;
+      try{ o = JSON.parse(txt); }catch(e){}
+      if(!o || !o.v){ toast('这条链接的内容读不出来，可能复制时缺了一截'); return; }
+      applySnap(o);
+      var nn = $('lqsName'); if(nn) nn.textContent = nameOf(o);
+      var bar = $('lqShareBar'); if(bar) bar.hidden = false;
+    }, function(){ toast('这条链接的内容读不出来，可能复制时缺了一截'); });
+  }else{
+    addDockBtn();
+  }
+  bind();
+
+  window.__lqShare = { build:buildLink, apply:applySnap, read:readSnap, deflate:deflate, inflate:inflate };
+})();
+</script>
+
 <script id="handbookEditor">
 /* ============================================================
    手账编辑层 v1
@@ -8757,7 +9094,7 @@ window.__pdfReady = !!window.pdfjsLib;
     <div class="lqg-step"><div class="lqg-n">2</div><div class="lqg-t">
       <b>上传照片，换成你的形象</b><span>点页面左边的人物形象 → 一键导入，粘贴或拖入照片即可；也可以让 AI 生成专属形象。</span></div></div>
     <div class="lqg-step"><div class="lqg-n">3</div><div class="lqg-t">
-      <b>生成网页，下载保存</b><span>点右侧地球图标「生成网页」，会下载一个单文件 HTML，双击就能打开，也能发给别人。</span></div></div>
+      <b>拿一条链接，发给别人</b><span>点右侧「分享链接」生成一条网址，复制发微信就行，对方点开就是你的主页；也可以点「生成网页」下载成文件保存。</span></div></div>
     <div class="lqg-btns">
       <button class="lqg-btn p" id="lqgResume" type="button">① 上传简历 / 粘贴文字</button>
       <button class="lqg-btn s" id="lqgPhoto" type="button">② 换我的形象</button>
@@ -8775,7 +9112,7 @@ window.__pdfReady = !!window.pdfjsLib;
   function open(){ G.hidden=false; }
   function close(){ G.hidden=true; try{ localStorage.setItem(KEY,'1'); }catch(e){} }
   var shown=false; try{ shown = localStorage.getItem(KEY)==='1'; }catch(e){}
-  if(!shown) setTimeout(open, 700);
+  if(!shown && !window.__LQ_SHARED__) setTimeout(open, 700);
   document.getElementById('lqgHelp').addEventListener('click', open);
   document.getElementById('lqgMine').addEventListener('click', close);
   G.addEventListener('click', function(e){ if(e.target===G) close(); });
@@ -8788,6 +9125,19 @@ window.__pdfReady = !!window.pdfjsLib;
       var slot=document.querySelector('.avatar-slot')||document.querySelector('.av-rig');
       if(slot) slot.click();
     }, 260);
+  });
+  /* 微信内置浏览器会拦截下载：提前提示「右上角 ··· → 在浏览器打开」 */
+  var isWx=/MicroMessenger/i.test(navigator.userAgent||'');
+  if(isWx){
+    var s3=document.querySelectorAll('.lqg-step')[2];
+    if(s3){ var sp=s3.querySelector('span');
+      if(sp) sp.innerHTML='微信里直接打开分享链接就行，不用下载文件；想下载成文件时，点右上角「···」→ 在浏览器打开（微信内置浏览器会拦截下载）。'; }
+  }
+  var be=document.getElementById('btnExport');
+  if(be) be.addEventListener('click', function(){
+    if(!isWx) return;
+    var t2=document.getElementById('toast');
+    if(t2){ t2.textContent='微信里可能拦下载：点右上角「···」→ 在浏览器打开后重试'; t2.classList.add('show'); }
   });
   document.addEventListener('keydown', function(e){ if(e.key==='Escape') close(); });
 })();
