@@ -45,3 +45,13 @@ Made by 刘全 Quentin Liu · 香港城市大学 数据科学
 
 打开后按引导三步走：上传简历（PDF / 粘贴文字）自动填内容 → 上传照片换成自己的形象 → 点「生成网页」下载单文件 HTML。纯前端、本机处理，不上传服务器。
 
+## 页面入口
+
+| 路径 | 内容 |
+|---|---|
+| `/` | 示例：个人主页（脱敏版） |
+| `/ai-kit.html` | AI 形象复刻套件 |
+| `/make-yours.html` | 个人主页生成器（完整版，368KB） |
+| `/make/` | **生成器入口页（5.4KB 秒开）**：先出进度与说明，再从 CDN 拉取 `/make-yours.html` 渲染；CDN 不通时回退同目录 `app.html`。适合微信内分享 |
+
+`/make/` 的取源顺序：`cdn.jsdelivr.net` → `gcore.jsdelivr.net` → `github.io` → `app.html`。
